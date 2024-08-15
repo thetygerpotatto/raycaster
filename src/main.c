@@ -18,17 +18,22 @@ Vector2 screenCordsToMapCords(Vector2 pos);
 void drawLine(Vector2 pos1, Vector2 pos2);
 bool** createMap(map m);
 bool isWhole(float n);
-Vector2 calculateRayX(Vector2 centerPoint, float viewAngle);
-Vector2 calculateRayY(Vector2 centerPoint, float viewAngle);
 Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3);
+float snap(float p1, float sign);
+float sign(float x);
+Vector2 step(Vector2 pc, float angle);
 
-int const screenHeight = 720;
-int const screenWidth = 1250;
-int frameCount = 0;
+const int screenHeight = 720;
+const int screenWidth = 1250;
+const int miniMapHeight = 200;
+const int miniMapwidth = 200;
 const int mapSegments = 10;
 
-const int mapWidth = 480;
-const int mapHeight = 560;
+const Vector2 miniMapCords = {screenWidth - miniMapwidth, 0};
+
+int frameCount = 0;
+float EPS = 1e-3;
+
 
 map gameMap = {.rows = mapSegments, .cols = mapSegments};
 
@@ -42,8 +47,8 @@ Color rayColor = {0xe5,0xbe,0x01,0xff};
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
 
-    spacing_x = (float)mapWidth/(float)mapSegments;
-    spacing_y = (float)mapHeight/(float)mapSegments;
+    spacing_x = (float)miniMapwidth/(float)mapSegments;
+    spacing_y = (float)miniMapwidth/(float)mapSegments;
 
     Vector2 centerPoint = {2, 2};
     Vector2 seccondPoint = {6, 6};
@@ -66,8 +71,9 @@ int main(int argc, char ** argv) {
 
     while (!WindowShouldClose()) {
         frameCount+=1;
-        //Inteserctions with the x and y axis
-        seccondPoint = getClosest(centerPoint, calculateRayX(centerPoint, viewAngle), calculateRayY(centerPoint, viewAngle));
+
+        //trace ray
+        seccondPoint = step(centerPoint, viewAngle);
 
         BeginDrawing();
         ClearBackground(backgrounColor);
@@ -95,94 +101,59 @@ int main(int argc, char ** argv) {
     }
 }
 
-Vector2 calculateRayX(Vector2 centerPoint, float viewAngle) {
-        for (float x, y, step, iter = 0; ; iter++) {
-            if (cosf(viewAngle) > 0) {
-                step = 1;
-            } else if (cosf(viewAngle) < 0) {
-                step = -1;
-            } else {
-                step = 0;
-            }
+Vector2 step(Vector2 pc, float angle) {
+    Vector2 p1 = pc;
+    Vector2 p2;
+    float dir_x = sign(cosf(angle));
+    float dir_y = sign(sinf(angle));
+    
+    for (;;) {
+        Vector2 xp2;
+        Vector2 yp2;
 
-            float offset;
-            if (step == 1) {
-                offset = ceilf(centerPoint.x) - centerPoint.x;
-            } else if(step == -1) {
-                offset = centerPoint.x - floorf(centerPoint.x);
-            } else {
-                return (Vector2){gameMap.cols, gameMap.rows};
-            }
-
-            x = step * (iter + offset);
-            y = tanf(viewAngle)*x;
-            
-            float map_x = x + centerPoint.x;
-            float map_y = y + centerPoint.y;
-
-            if (map_x > 0 && map_x < gameMap.cols &&
-                map_y > 0 && map_y < gameMap.rows) {
-
-                if (step == -1) {
-                    if (gameMap.cells[(int)map_x-1][(int)map_y]) {
-                        return (Vector2){map_x, map_y};
-                    }
-                } else {
-                    if (gameMap.cells[(int)map_x][(int)map_y]) {
-                        return (Vector2){map_x, map_y};
-                    }
-                }
-            } else {
-                return (Vector2){map_x, map_y};
-            }
+        if (dir_x != 0) {
+            xp2.x = snap(p1.x, dir_x);
+            xp2.y = p1.y;
+            xp2.y += (xp2.x - p1.x)*tanf(angle);
+        } else {
+            xp2.x = (dir_y < 0) ? 0 : gameMap.cols;
+            xp2.y = p1.y;
         }
-}
-
-Vector2 calculateRayY(Vector2 centerPoint, float viewAngle) {
-        for (float x, y, step, iter = 0;; iter++) {
-            if (sinf(viewAngle) > 0) {
-                step = 1;
-            } else if (sinf(viewAngle) < 0) {
-                step = -1;
-            } else {
-                step = 0;
-            }
-
-            float offset;
-            if (step == 1) {
-                offset = ceilf(centerPoint.y) - centerPoint.y;
-            } else if(step == -1) {
-                offset = centerPoint.y - floorf(centerPoint.y);
-            } else {
-                return (Vector2){gameMap.cols, gameMap.rows};
-            }
         
-
-            y = step*(iter + offset);
-            x = y / tanf(viewAngle);
-            //if (tanf(viewAngle) == 0) x = 0.0f;
-
-            float map_x = x + centerPoint.x;
-            float map_y = y + centerPoint.y;
-
-            if (map_x > 0 && map_x < gameMap.cols &&
-                map_y > 0 && map_y < gameMap.rows) {
-
-                if (step == -1) {
-                    if (gameMap.cells[(int)map_x][(int)map_y-1]) {
-                        return (Vector2){map_x, map_y};
-                    }
-                } else {
-                    if (gameMap.cells[(int)map_x][(int)map_y]) {
-                        return (Vector2){map_x, map_y};
-                    }
-                }
-
-            } else {
-                return (Vector2){map_x, map_y};
-            }
+        if (dir_y != 0){
+            yp2.y = snap(p1.y, dir_y);
+            yp2.x = p1.x;
+            yp2.x += (yp2.y - p1.y)/tanf(angle);
+        } else {
+            yp2.x = (dir_x < 0) ? 0 : gameMap.rows;
+            yp2.y = p1.y;
         }
+
+        p2 = getClosest(p1, xp2, yp2);
+        p1 = p2;
+
+        if (p2.x > 0 && p2.x < gameMap.cols &&
+            p2.y > 0 && p2.x < gameMap.rows) {
+
+            if (gameMap.cells[(int)p2.x][(int)p2.y]) {
+                return p2;
+            }
+        } 
+        else 
+        {
+
+            return pc;
+        }
+    }
+
 }
+
+float snap(float x, float sign) {
+    if (sign == 1) return ceilf(x) +sign*EPS;
+    if (sign == -1) return floorf(x) + sign*EPS;
+    return x;
+}
+
 
 Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3) {
     float d2 = Vector2Distance(vec1, vec2);
@@ -192,38 +163,41 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3) {
     return (d2 < d3) ? vec2 : vec3;
 }
 
+
 void drawMap() {
     for (unsigned int i  = 0 ; i < mapSegments + 1 ; ++i) {
-            DrawLineV((Vector2){0, spacing_y*i+1}, (Vector2){mapWidth, spacing_y*i+1}, RAYWHITE);
+            DrawLineV((Vector2){miniMapCords.x + 0, + miniMapCords.y + spacing_y*i+1},
+                      (Vector2){miniMapCords.x + miniMapwidth, miniMapCords.y + spacing_y*i+1}, RAYWHITE);
     }
 
     for (unsigned int i  = 0 ; i < mapSegments + 1 ; ++i) {
-            DrawLineV((Vector2){spacing_x*i+1, 0}, (Vector2){spacing_x*i+1, mapHeight}, RAYWHITE);
+            DrawLineV((Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + 0},
+                      (Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + miniMapHeight}, RAYWHITE);
     }
 
     for (size_t rows = 0; rows < gameMap.rows; ++rows) {
         for (size_t cols = 0 ; cols < gameMap.cols; ++cols) {
             if (gameMap.cells[rows][cols]) {
-                DrawRectangle(spacing_x*cols+1, spacing_y*rows+1, spacing_x-2, spacing_y-2 , wallColor);
+                DrawRectangle(miniMapCords.x + spacing_x*cols+1, miniMapCords.y + spacing_y*rows+1, spacing_x-2, spacing_y-2 , wallColor);
             }
         }
     }
 }
 
 void drawPoint(Vector2 point, float r) {
-    Vector2 screenPoint = {point.x*mapWidth/mapSegments, point.y*mapHeight/mapSegments};
+    Vector2 screenPoint = {miniMapCords.x + point.x*miniMapwidth/mapSegments, miniMapCords.y + point.y*miniMapHeight/mapSegments};
     DrawCircleV(screenPoint, r, rayColor);
 }
 
 void drawLine(Vector2 pos1, Vector2 pos2) {
-    Vector2 screenPos1 = {pos1.x*spacing_x, pos1.y*spacing_y,};
-    Vector2 screenPos2 = {pos2.x*spacing_x, pos2.y*spacing_y};
+    Vector2 screenPos1 = {miniMapCords.x + pos1.x*spacing_x, miniMapCords.y + pos1.y*spacing_y,};
+    Vector2 screenPos2 = {miniMapCords.x + pos2.x*spacing_x, miniMapCords.y + pos2.y*spacing_y};
 
     DrawLineV(screenPos1, screenPos2, rayColor);
 }
 
 Vector2 screenCordsToMapCords(Vector2 pos) {
-    return (Vector2){pos.x/mapWidth*mapSegments, pos.y/mapHeight*mapSegments};
+    return (Vector2){miniMapCords.x + pos.x/miniMapwidth*mapSegments, miniMapCords.y + pos.y/miniMapHeight*mapSegments};
 }
 
 bool** createMap(map m) {
@@ -234,9 +208,16 @@ bool** createMap(map m) {
     }
     return newMap;
 }
+
 bool isWhole(float n) {
     if (n == (int)n) {
         return true;
     }
     return false;
+}
+
+float sign(float x) {
+    if (x > 0) return 1;
+    if (x < 0) return -1;
+    return 0;
 }
