@@ -97,12 +97,21 @@ int main(int argc, char ** argv) {
 
 Vector2 calculateRayX(Vector2 centerPoint, float viewAngle) {
         for (float x, y, step, iter = 0; ; iter++) {
-            step = (cosf(viewAngle) > 0) ? 1 : -1;
+            if (cosf(viewAngle) > 0) {
+                step = 1;
+            } else if (cosf(viewAngle) < 0) {
+                step = -1;
+            } else {
+                step = 0;
+            }
+
             float offset;
             if (step == 1) {
                 offset = ceilf(centerPoint.x) - centerPoint.x;
             } else if(step == -1) {
-                offset = centerPoint.x - floor(centerPoint.x);
+                offset = centerPoint.x - floorf(centerPoint.x);
+            } else {
+                return (Vector2){gameMap.cols, gameMap.rows};
             }
 
             x = step * (iter + offset);
@@ -131,17 +140,27 @@ Vector2 calculateRayX(Vector2 centerPoint, float viewAngle) {
 
 Vector2 calculateRayY(Vector2 centerPoint, float viewAngle) {
         for (float x, y, step, iter = 0;; iter++) {
-            step = (sinf(viewAngle) > 0) ? 1 : -1;
+            if (sinf(viewAngle) > 0) {
+                step = 1;
+            } else if (sinf(viewAngle) < 0) {
+                step = -1;
+            } else {
+                step = 0;
+            }
+
             float offset;
             if (step == 1) {
                 offset = ceilf(centerPoint.y) - centerPoint.y;
             } else if(step == -1) {
-                offset = centerPoint.y - floor(centerPoint.y);
-            } 
+                offset = centerPoint.y - floorf(centerPoint.y);
+            } else {
+                return (Vector2){gameMap.cols, gameMap.rows};
+            }
+        
 
             y = step*(iter + offset);
             x = y / tanf(viewAngle);
-            if (tanf(viewAngle) == 0) x = 0.0f;
+            //if (tanf(viewAngle) == 0) x = 0.0f;
 
             float map_x = x + centerPoint.x;
             float map_y = y + centerPoint.y;
