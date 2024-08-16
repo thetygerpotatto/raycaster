@@ -23,11 +23,11 @@ float sign(float x);
 Vector2 step(Vector2 pc, float angle);
 void drawPov(Vector2 p1, Vector2 dir, float angle);
 
-const int screenHeight = 720;
-const int screenWidth = 1250;
+const int screenHeight = 1080;
+const int screenWidth = 1920;
 const int miniMapHeight = 200;
 const int miniMapwidth = 200;
-const int mapSegments = 30;
+const int mapSegments = 10;
 
 const Vector2 miniMapCords = {screenWidth - miniMapwidth, 0};
 
@@ -190,13 +190,13 @@ void drawMiniMap() {
 void drawPov(Vector2 pc, Vector2 dir, float angle) {
     Vector2 p1, p2;
     Vector2 plane = {dir.y, -dir.x};
-    float planeWidth = 5;
+    float planeWidth = 3.0f;
     plane = Vector2Scale(plane, planeWidth/2);
     
     float cameraStep = planeWidth/screenWidth;
     for (int x = 0 ; x < screenWidth; x++) {
         
-        p1 = Vector2Add(Vector2Subtract(pc, plane), Vector2Scale(Vector2Normalize(plane), x*cameraStep));
+        p1 = Vector2Add(Vector2Subtract(Vector2Add(pc, Vector2Scale(dir, 0.5f)), plane), Vector2Scale(Vector2Normalize(plane), x*cameraStep));
         drawPoint(p1, 1.0f);
         p2 = step(p1, angle);
         float distance = Vector2Distance(p1, p2);
