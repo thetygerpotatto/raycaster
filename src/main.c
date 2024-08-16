@@ -1,4 +1,3 @@
-#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -12,7 +11,7 @@ typedef struct map {
     bool **cells;
 } map;
 
-void drawMap();
+void drawMiniMap();
 void drawPoint(Vector2 point, float r);
 Vector2 screenCordsToMapCords(Vector2 pos);
 void drawLine(Vector2 pos1, Vector2 pos2);
@@ -22,12 +21,13 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3);
 float snap(float p1, float sign);
 float sign(float x);
 Vector2 step(Vector2 pc, float angle);
+void drawPov(Vector2 p1, Vector2 dir, float angle);
 
 const int screenHeight = 720;
 const int screenWidth = 1250;
 const int miniMapHeight = 200;
 const int miniMapwidth = 200;
-const int mapSegments = 10;
+const int mapSegments = 30;
 
 const Vector2 miniMapCords = {screenWidth - miniMapwidth, 0};
 
@@ -53,8 +53,9 @@ int main(int argc, char ** argv) {
     Vector2 centerPoint = {2, 2};
     Vector2 seccondPoint = {6, 6};
     float viewAngle = 0;
-    float norm = 8.0f;
-    Vector2 dir = {cosf(viewAngle)*norm, sinf(viewAngle)*norm};
+
+    Vector2 dir = {cosf(viewAngle), sinf(viewAngle)};
+    const float pov = 8.0f * PI / 18.f;
 
 
     InitWindow(screenWidth, screenHeight, "Raycast the Hell out of it");
@@ -62,7 +63,7 @@ int main(int argc, char ** argv) {
 
     for (size_t x = 0; x < gameMap.cols; x++) {
         for (size_t y = 0; y < gameMap.rows; y++) {
-            if (x == 0 || x == 9 || y == 0 || y == 9) gameMap.cells[x][y] = true;
+            if (x == 0 || x == gameMap.cols-1 || y == 0 || y == gameMap.rows-1) gameMap.cells[x][y] = true;
         }
     }
 
@@ -78,8 +79,8 @@ int main(int argc, char ** argv) {
         BeginDrawing();
         ClearBackground(backgrounColor);
 
-
-        drawMap();
+        drawPov(centerPoint, dir, viewAngle);
+        drawMiniMap();
 
 
         drawPoint(centerPoint, 5.0f);
@@ -97,6 +98,8 @@ int main(int argc, char ** argv) {
             if (IsKeyDown(KEY_LEFT)) viewAngle += PI/120.0f;
             if (IsKeyDown(KEY_RIGHT)) viewAngle -= PI/120.0f;
         }
+
+        dir = (Vector2){cosf(viewAngle), sinf(viewAngle)};
         
     }
 }
@@ -164,7 +167,7 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3) {
 }
 
 
-void drawMap() {
+void drawMiniMap() {
     for (unsigned int i  = 0 ; i < mapSegments + 1 ; ++i) {
             DrawLineV((Vector2){miniMapCords.x + 0, + miniMapCords.y + spacing_y*i+1},
                       (Vector2){miniMapCords.x + miniMapwidth, miniMapCords.y + spacing_y*i+1}, RAYWHITE);
@@ -181,6 +184,28 @@ void drawMap() {
                 DrawRectangle(miniMapCords.x + spacing_x*cols+1, miniMapCords.y + spacing_y*rows+1, spacing_x-2, spacing_y-2 , wallColor);
             }
         }
+    }
+}
+
+void drawPov(Vector2 pc, Vector2 dir, float angle) {
+    Vector2 p1, p2;
+    Vector2 plane = {dir.y, -dir.x};
+    float planeWidth = 5;
+    plane = Vector2Scale(plane, planeWidth/2);
+    
+    float cameraStep = planeWidth/screenWidth;
+    for (int x = 0 ; x < screenWidth; x++) {
+        
+        p1 = Vector2Add(Vector2Subtract(pc, plane), Vector2Scale(Vector2Normalize(plane), x*cameraStep));
+        drawPoint(p1, 1.0f);
+        p2 = step(p1, angle);
+        float distance = Vector2Distance(p1, p2);
+        float wallSize = 1/distance * screenHeight;
+        float startDrawing = ((float)screenHeight/2) - wallSize/2;
+        float EndDrawing = ((float)screenHeight/2) + wallSize/2;
+        if (startDrawing < 0) startDrawing = 0;
+        if (startDrawing >= screenHeight) startDrawing = screenHeight-1;
+        DrawLine(x, startDrawing, x, EndDrawing, BLUE);
     }
 }
 
