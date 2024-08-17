@@ -22,7 +22,7 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3);
 float snap(float p1, float sign);
 float sign(float x);
 Vector2 step(Vector2 pc, float angle);
-void drawPov(Vector2 p1, float fov, float angle, Vector2 dir);
+void drawFov(Vector2 p1, float fov, float angle, Vector2 dir);
 Vector2 collision(Vector2 newcords, Vector2 oldCords);
 
 const int screenHeight = 1080;
@@ -98,7 +98,7 @@ int main(int argc, char ** argv) {
 
             ClearBackground(backgroundColor);
 
-            drawPov(centerPoint, fov, viewAngle, dir);
+            drawFov(centerPoint, fov, viewAngle, dir);
             drawMiniMap();
 
 
@@ -216,7 +216,7 @@ void drawMiniMap() {
     }
 }
 
-void drawPov(Vector2 pc, float fov, float angle, Vector2 dir) {
+void drawFov(Vector2 pc, float fov, float angle, Vector2 dir) {
     for (int x = 0; x < screenWidth; ++x) {
         float currentAngle = (angle - fov / 2) + fov/screenWidth*x; 
         Vector2 p1 = step(pc, currentAngle);
@@ -227,8 +227,9 @@ void drawPov(Vector2 pc, float fov, float angle, Vector2 dir) {
         float wallHeight = screenHeight / distance;
         float startDrawing = screenHeight/2 - wallHeight/2;
         float endDrawing = screenHeight/2 + wallHeight/2;
+        float defaultDistance = 10;
         
-        Color wallShade = gameMap.cells[(int)p1.x][(int)p1.y];
+        Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
         DrawLine(x, startDrawing, x, endDrawing, wallShade);
     }
 }
