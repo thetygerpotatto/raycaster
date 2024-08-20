@@ -25,32 +25,32 @@ Vector2 step(Vector2 pc, float angle);
 void drawFov(Vector2 p1, float fov, float angle, Vector2 dir);
 Vector2 collision(Vector2 newcords, Vector2 oldCords);
 
-const int screenHeight = 1080;
-const int screenWidth = 1920;
-const int miniMapHeight = 200;
-const int miniMapwidth = 200;
-const int mapSegments = 15;
+const int SCREEN_HEIGHT = 720;
+const int SCREEN_WIDTH = 1080;
+const int MINIMAP_HEIGHT = 200;
+const int MINIMAP_WIDTH = 200;
+const int H_SEGMENTS = 15;
+const int V_SEGMENTS = 15;
+const int FRAME_TARGET = 60;
 
-const Vector2 miniMapCords = {screenWidth - miniMapwidth, 0};
+const Vector2 miniMapCords = {SCREEN_WIDTH - MINIMAP_WIDTH, 0};
 
-int frameCount = 0;
-float EPS = 1e-3;
+const float spacing_x = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
+const float spacing_y = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
+
+const float EPS = 1e-3;
 
 
-map gameMap = {.rows = mapSegments, .cols = mapSegments};
+map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
 
-float spacing_x;
-float spacing_y;
 
-Color backgroundColor = {0x45,0x45,0x45,0xff};
-Color wallColor = {0x19, 0x19, 0x19, 0xff};
-Color rayColor = {0xe5,0xbe,0x01,0xff};
+
+const Color backgroundColor = {0x45,0x45,0x45,0xff};
+const Color wallColor = {0x19, 0x19, 0x19, 0xff};
+const Color rayColor = {0xe5,0xbe,0x01,0xff};
 
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
-
-    spacing_x = (float)miniMapwidth/(float)mapSegments;
-    spacing_y = (float)miniMapwidth/(float)mapSegments;
 
     Vector2 centerPoint = {2, 2};
     Vector2 seccondPoint = {6, 6};
@@ -62,8 +62,9 @@ int main(int argc, char ** argv) {
     bool render = true;
 
 
-    InitWindow(screenWidth, screenHeight, "Raycast the Hell out of it");
-    SetTargetFPS(60);
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raycast the Hell out of it");
+    SetTargetFPS(FRAME_TARGET);
+
     for (size_t x = 0; x < gameMap.cols; x++) {
         for (size_t y = 0; y < gameMap.rows; y++) {
             gameMap.cells[x][y] = wallColor;
@@ -86,10 +87,7 @@ int main(int argc, char ** argv) {
     gameMap.cells[8][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
     gameMap.cells[7][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
 
-
-
     while (!WindowShouldClose()) {
-        frameCount+=1;
 
         BeginDrawing();
         if (render) {
@@ -113,24 +111,19 @@ int main(int argc, char ** argv) {
         
         dir = (Vector2){cosf(viewAngle), sinf(viewAngle)};
 
-        if (frameCount >= 1) {
-            frameCount = 0;
-            if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, 0.06f)), centerPoint);
-            if (IsKeyDown(KEY_S)) centerPoint = collision(Vector2Subtract(centerPoint, Vector2Scale(dir, 0.06f)),
-                                                          centerPoint);
-            if (IsKeyDown(KEY_D)) centerPoint = collision(Vector2Add(centerPoint,
-                                                           Vector2Scale(Vector2Rotate(dir, PI/2.0f), 0.06f)),
-                                                          centerPoint);
-            if (IsKeyDown(KEY_A)) centerPoint = collision(Vector2Add(centerPoint,
-                                                           Vector2Scale(Vector2Rotate(dir, -PI/2.0f), 0.06f))
-                                                            , centerPoint);
-            if (IsKeyDown(KEY_LEFT)) viewAngle -= PI/120.0f;
-            if (IsKeyDown(KEY_RIGHT)) viewAngle += PI/120.0f;
-            if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D) ||
-                IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_RIGHT)) render = true;
-        }
-
-        
+        if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, 0.06f)), centerPoint);
+        if (IsKeyDown(KEY_S)) centerPoint = collision(Vector2Subtract(centerPoint, Vector2Scale(dir, 0.06f)),
+                                                      centerPoint);
+        if (IsKeyDown(KEY_D)) centerPoint = collision(Vector2Add(centerPoint,
+                                                       Vector2Scale(Vector2Rotate(dir, PI/2.0f), 0.06f)),
+                                                      centerPoint);
+        if (IsKeyDown(KEY_A)) centerPoint = collision(Vector2Add(centerPoint,
+                                                       Vector2Scale(Vector2Rotate(dir, -PI/2.0f), 0.06f))
+                                                        , centerPoint);
+        if (IsKeyDown(KEY_LEFT)) viewAngle -= PI/120.0f;
+        if (IsKeyDown(KEY_RIGHT)) viewAngle += PI/120.0f;
+        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D) ||
+            IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_RIGHT)) render = true;
     }
 }
 
@@ -197,14 +190,14 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3) {
 
 
 void drawMiniMap() {
-    for (unsigned int i  = 0 ; i < mapSegments + 1 ; ++i) {
+    for (unsigned int i  = 0 ; i < H_SEGMENTS + 1 ; ++i) {
             DrawLineV((Vector2){miniMapCords.x + 0, + miniMapCords.y + spacing_y*i+1},
-                      (Vector2){miniMapCords.x + miniMapwidth, miniMapCords.y + spacing_y*i+1}, RAYWHITE);
+                      (Vector2){miniMapCords.x + MINIMAP_WIDTH, miniMapCords.y + spacing_y*i+1}, RAYWHITE);
     }
 
-    for (unsigned int i  = 0 ; i < mapSegments + 1 ; ++i) {
+    for (unsigned int i  = 0 ; i < H_SEGMENTS + 1 ; ++i) {
             DrawLineV((Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + 0},
-                      (Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + miniMapHeight}, RAYWHITE);
+                      (Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + MINIMAP_HEIGHT}, RAYWHITE);
     }
 
     for (size_t cols = 0; cols < gameMap.cols; ++cols) {
@@ -217,17 +210,17 @@ void drawMiniMap() {
 }
 
 void drawFov(Vector2 pc, float fov, float angle, Vector2 dir) {
-    for (int x = 0; x < screenWidth; ++x) {
-        float currentAngle = (angle - fov / 2) + fov/screenWidth*x; 
+    for (int x = 0; x < SCREEN_WIDTH; ++x) {
+        float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
         drawLine(pc, p1);
         Vector2 v = Vector2Subtract(p1, pc);
         float distance = Vector2DotProduct(v, dir);
 
-        float wallHeight = screenHeight / distance;
-        float startDrawing = screenHeight/2 - wallHeight/2;
-        float endDrawing = screenHeight/2 + wallHeight/2;
-        float defaultDistance = 10;
+        float wallHeight = SCREEN_HEIGHT / distance;
+        float startDrawing = SCREEN_HEIGHT/2 - wallHeight/2;
+        float endDrawing = SCREEN_HEIGHT/2 + wallHeight/2;
+        float defaultDistance = H_SEGMENTS;
         
         Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
         DrawLine(x, startDrawing, x, endDrawing, wallShade);
@@ -235,7 +228,7 @@ void drawFov(Vector2 pc, float fov, float angle, Vector2 dir) {
 }
 
 void drawPoint(Vector2 point, float r) {
-    Vector2 screenPoint = {miniMapCords.x + point.x*miniMapwidth/mapSegments, miniMapCords.y + point.y*miniMapHeight/mapSegments};
+    Vector2 screenPoint = {miniMapCords.x + point.x*MINIMAP_WIDTH/H_SEGMENTS, miniMapCords.y + point.y*MINIMAP_HEIGHT/H_SEGMENTS};
     DrawCircleV(screenPoint, r, rayColor);
 }
 
@@ -247,7 +240,7 @@ void drawLine(Vector2 pos1, Vector2 pos2) {
 }
 
 Vector2 screenCordsToMapCords(Vector2 pos) {
-    return (Vector2){miniMapCords.x + pos.x/miniMapwidth*mapSegments, miniMapCords.y + pos.y/miniMapHeight*mapSegments};
+    return (Vector2){miniMapCords.x + pos.x/MINIMAP_WIDTH*H_SEGMENTS, miniMapCords.y + pos.y/MINIMAP_HEIGHT*H_SEGMENTS};
 }
 
 Vector2 collision(Vector2 newcords, Vector2 oldCords) {
