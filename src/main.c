@@ -11,10 +11,14 @@ typedef struct map {
     Color **cells;
 } map;
 
+// Drawing functions 
 void drawMiniMap();
-void drawPoint(Vector2 point, float r);
+void drawPointInMap(Vector2 point, float r);
+void drawLineInMap(Vector2 pos1, Vector2 pos2);
+void renderFOV(Vector2 p1, float fov, float angle, Vector2 dir);
+
+// logic functions
 Vector2 screenCordsToMapCords(Vector2 pos);
-void drawLine(Vector2 pos1, Vector2 pos2);
 Color** createMap(map m);
 bool isWhole(float n);
 bool cmpColor(Color a, Color b);
@@ -22,9 +26,13 @@ Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3);
 float snap(float p1, float sign);
 float sign(float x);
 Vector2 step(Vector2 pc, float angle);
-void drawFov(Vector2 p1, float fov, float angle, Vector2 dir);
 Vector2 collision(Vector2 newcords, Vector2 oldCords);
 
+// load resources
+void loadResources();
+void unloadResources();
+
+// Game constants
 const int SCREEN_HEIGHT = 720;
 const int SCREEN_WIDTH = 1080;
 const int MINIMAP_HEIGHT = 200;
@@ -40,18 +48,17 @@ const float spacing_y = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
 
 const float EPS = 1e-3;
 
-
-map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
-
-
-
 const Color backgroundColor = {0x45,0x45,0x45,0xff};
 const Color wallColor = {0x19, 0x19, 0x19, 0xff};
 const Color rayColor = {0xe5,0xbe,0x01,0xff};
 
+map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
+// Texture variables
+Texture2D brick;
+
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
-
+    
     Vector2 centerPoint = {2, 2};
     Vector2 seccondPoint = {6, 6};
     float viewAngle = 0;
@@ -63,7 +70,9 @@ int main(int argc, char ** argv) {
 
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raycast the Hell out of it");
+    loadResources();
     SetTargetFPS(FRAME_TARGET);
+
 
     for (size_t x = 0; x < gameMap.cols; x++) {
         for (size_t y = 0; y < gameMap.rows; y++) {
@@ -87,6 +96,7 @@ int main(int argc, char ** argv) {
     gameMap.cells[8][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
     gameMap.cells[7][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
 
+    Vector2 bcords = {100, 100};
     while (!WindowShouldClose()) {
 
         BeginDrawing();
@@ -96,16 +106,18 @@ int main(int argc, char ** argv) {
 
             ClearBackground(backgroundColor);
 
-            drawFov(centerPoint, fov, viewAngle, dir);
+            renderFOV(centerPoint, fov, viewAngle, dir);
             drawMiniMap();
 
 
-            drawPoint(centerPoint, 5.0f);
-            drawPoint(seccondPoint, 5.0f);
-            drawLine(centerPoint, seccondPoint);
+            drawPointInMap(centerPoint, 5.0f);
+            drawPointInMap(seccondPoint, 5.0f);
+            drawLineInMap(centerPoint, seccondPoint);
 
             render = false;
         }
+        
+
         EndDrawing();
 
         
@@ -125,6 +137,7 @@ int main(int argc, char ** argv) {
         if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D) ||
             IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_RIGHT)) render = true;
     }
+    unloadResources();
 }
 
 Vector2 step(Vector2 pc, float angle) {
@@ -195,7 +208,7 @@ void drawMiniMap() {
                       (Vector2){miniMapCords.x + MINIMAP_WIDTH, miniMapCords.y + spacing_y*i+1}, RAYWHITE);
     }
 
-    for (unsigned int i  = 0 ; i < H_SEGMENTS + 1 ; ++i) {
+    for (unsigned int i  = 0 ; i < V_SEGMENTS + 1 ; ++i) {
             DrawLineV((Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + 0},
                       (Vector2){miniMapCords.x + spacing_x*i+1, miniMapCords.y + MINIMAP_HEIGHT}, RAYWHITE);
     }
@@ -209,11 +222,13 @@ void drawMiniMap() {
     }
 }
 
-void drawFov(Vector2 pc, float fov, float angle, Vector2 dir) {
+void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
+    Image newbrick = LoadImageFromTexture(brick);
+
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
         float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
-        drawLine(pc, p1);
+        drawLineInMap(pc, p1);
         Vector2 v = Vector2Subtract(p1, pc);
         float distance = Vector2DotProduct(v, dir);
 
@@ -227,12 +242,12 @@ void drawFov(Vector2 pc, float fov, float angle, Vector2 dir) {
     }
 }
 
-void drawPoint(Vector2 point, float r) {
-    Vector2 screenPoint = {miniMapCords.x + point.x*MINIMAP_WIDTH/H_SEGMENTS, miniMapCords.y + point.y*MINIMAP_HEIGHT/H_SEGMENTS};
+void drawPointInMap(Vector2 point, float r) {
+    Vector2 screenPoint = {miniMapCords.x + point.x*MINIMAP_WIDTH/H_SEGMENTS, miniMapCords.y + point.y*MINIMAP_HEIGHT/V_SEGMENTS};
     DrawCircleV(screenPoint, r, rayColor);
 }
 
-void drawLine(Vector2 pos1, Vector2 pos2) {
+void drawLineInMap(Vector2 pos1, Vector2 pos2) {
     Vector2 screenPos1 = {miniMapCords.x + pos1.x*spacing_x, miniMapCords.y + pos1.y*spacing_y,};
     Vector2 screenPos2 = {miniMapCords.x + pos2.x*spacing_x, miniMapCords.y + pos2.y*spacing_y};
 
@@ -282,4 +297,12 @@ float sign(float x) {
     if (x > 0) return 1;
     if (x < 0) return -1;
     return 0;
+}
+
+void loadResources() {
+    brick = LoadTexture("resources/brick.png");
+}
+
+void unloadResources() {
+    UnloadTexture(brick);
 }
