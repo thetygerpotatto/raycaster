@@ -27,8 +27,9 @@ float snap(float p1, float sign);
 float sign(float x);
 Vector2 step(Vector2 pc, float angle);
 Vector2 collision(Vector2 newcords, Vector2 oldCords);
+float getWallTouchPoint(Vector2 point);
 
-// load resources
+// load and unload resources
 void loadResources();
 void unloadResources();
 
@@ -39,6 +40,7 @@ const int MINIMAP_HEIGHT = 200;
 const int MINIMAP_WIDTH = 200;
 const int H_SEGMENTS = 15;
 const int V_SEGMENTS = 15;
+const int WALL_TEXTURE_WIDTH = 16;
 const int FRAME_TARGET = 60;
 
 const Vector2 miniMapCords = {SCREEN_WIDTH - MINIMAP_WIDTH, 0};
@@ -54,7 +56,7 @@ const Color rayColor = {0xe5,0xbe,0x01,0xff};
 
 map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
 // Texture variables
-Texture2D brick;
+Image brick;
 
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
@@ -116,8 +118,17 @@ int main(int argc, char ** argv) {
 
             render = false;
         }
+        int r,g,b,a;
+        for (int x=0; x < brick.width; ++x) {
+            for (int y = 0; y < brick.height; ++y) {
+                r = *((int *)&brick.data[brick.width*y + x] + 0);
+                g = *((int *)&brick.data[brick.width*y + x] + 1);
+                b = *((int *)&brick.data[brick.width*y + x] + 2);
+                a = *((int *)&brick.data[brick.width*y + x] + 3);
+                DrawRectangle(10+x*10, 100+y*10, 10, 10, (Color){r,g,b,a});
+            }
+        }
         
-
         EndDrawing();
 
         
@@ -223,22 +234,25 @@ void drawMiniMap() {
 }
 
 void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
-    Image newbrick = LoadImageFromTexture(brick);
-
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
         float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
+
+
         drawLineInMap(pc, p1);
         Vector2 v = Vector2Subtract(p1, pc);
         float distance = Vector2DotProduct(v, dir);
-
         float wallHeight = SCREEN_HEIGHT / distance;
-        float startDrawing = SCREEN_HEIGHT/2 - wallHeight/2;
-        float endDrawing = SCREEN_HEIGHT/2 + wallHeight/2;
+        float startDrawing = (float)SCREEN_HEIGHT/2 - wallHeight/2;
+        float endDrawing = (float)SCREEN_HEIGHT/2 + wallHeight/2;
         float defaultDistance = H_SEGMENTS;
         
+        int wallOffset = (int)getWallTouchPoint(p1);
+
         Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
-        DrawLine(x, startDrawing, x, endDrawing, wallShade);
+        //DrawLine(x, startDrawing, x, endDrawing, wallShade);
+        // UnloadImage(currentStripe);
+        // UnloadTexture(TcurrentStripe);
     }
 }
 
@@ -252,6 +266,19 @@ void drawLineInMap(Vector2 pos1, Vector2 pos2) {
     Vector2 screenPos2 = {miniMapCords.x + pos2.x*spacing_x, miniMapCords.y + pos2.y*spacing_y};
 
     DrawLineV(screenPos1, screenPos2, rayColor);
+}
+
+void createStripeFromImage(Image *source, Image *dest,  float x) {
+    Rectangle crop = {(int)(x), 0, 1 , source->height};
+    *dest = ImageCopy(*source);
+    ImageCrop(dest, crop);
+}
+
+float getWallTouchPoint(Vector2 point) {
+    float dx = point.x - floorf(point.x);
+    float dy = point.y - floorf(point.y);
+
+    return (dx < dy) ? dy : dx;
 }
 
 Vector2 screenCordsToMapCords(Vector2 pos) {
@@ -300,9 +327,9 @@ float sign(float x) {
 }
 
 void loadResources() {
-    brick = LoadTexture("resources/brick.png");
+    brick = LoadImageRaw(const char *fileName, int width, int height, int format, int headerSize);
 }
 
 void unloadResources() {
-    UnloadTexture(brick);
+    UnloadImage(brick);
 }
