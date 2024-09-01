@@ -44,7 +44,6 @@ const int WALL_TEXTURE_WIDTH = 16;
 const int FRAME_TARGET = 60;
 
 const Vector2 miniMapCords = {SCREEN_WIDTH - MINIMAP_WIDTH, 0};
-
 const float spacing_x = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
 const float spacing_y = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
 
@@ -53,6 +52,7 @@ const float EPS = 1e-3;
 const Color backgroundColor = {0x45,0x45,0x45,0xff};
 const Color wallColor = {0x19, 0x19, 0x19, 0xff};
 const Color rayColor = {0xe5,0xbe,0x01,0xff};
+Color *BrickColors;
 
 map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
 // Texture variables
@@ -98,12 +98,11 @@ int main(int argc, char ** argv) {
     gameMap.cells[8][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
     gameMap.cells[7][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
 
-    Vector2 bcords = {100, 100};
     while (!WindowShouldClose()) {
 
         BeginDrawing();
         if (render) {
-            //tace ray
+            //trace ray
             seccondPoint = step(centerPoint, viewAngle);
 
             ClearBackground(backgroundColor);
@@ -118,17 +117,6 @@ int main(int argc, char ** argv) {
 
             render = false;
         }
-        int r,g,b,a;
-        for (int x=0; x < brick.width; ++x) {
-            for (int y = 0; y < brick.height; ++y) {
-                r = *((int *)&brick.data[brick.width*y + x] + 0);
-                g = *((int *)&brick.data[brick.width*y + x] + 1);
-                b = *((int *)&brick.data[brick.width*y + x] + 2);
-                a = *((int *)&brick.data[brick.width*y + x] + 3);
-                DrawRectangle(10+x*10, 100+y*10, 10, 10, (Color){r,g,b,a});
-            }
-        }
-        
         EndDrawing();
 
         
@@ -234,7 +222,7 @@ void drawMiniMap() {
 }
 
 void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
-    for (int x = 0; x < SCREEN_WIDTH; ++x) {
+    for (int x = 0; x < SCREEN_WIDTH; x+=4) {
         float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
 
@@ -247,13 +235,22 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
         float endDrawing = (float)SCREEN_HEIGHT/2 + wallHeight/2;
         float defaultDistance = H_SEGMENTS;
         
-        int wallOffset = (int)getWallTouchPoint(p1);
+        int wallXOffset = (int)(getWallTouchPoint(p1) * (float)brick.width);
 
         Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
-        //DrawLine(x, startDrawing, x, endDrawing, wallShade);
-        // UnloadImage(currentStripe);
-        // UnloadTexture(TcurrentStripe);
+        
+        int upperBound = endDrawing;
+        for (int start = startDrawing; start < upperBound; start+=4) {
+            if (start < 0 || start > SCREEN_HEIGHT) {
+                start = 0;
+                upperBound = SCREEN_HEIGHT;
+            }
+            int pixelHeight = (start - startDrawing);
+            int pixelYIndex = (int)((float)pixelHeight/(endDrawing - startDrawing) * (float)brick.height);
+            DrawRectangle(x, start, 4, 4, ColorBrightness(BrickColors[brick.width*pixelYIndex + wallXOffset], distance/defaultDistance - 0.5f));
+        }
     }
+
 }
 
 void drawPointInMap(Vector2 point, float r) {
@@ -275,10 +272,15 @@ void createStripeFromImage(Image *source, Image *dest,  float x) {
 }
 
 float getWallTouchPoint(Vector2 point) {
-    float dx = point.x - floorf(point.x);
-    float dy = point.y - floorf(point.y);
-
-    return (dx < dy) ? dy : dx;
+    float under = fabsf(point.x - floorf(point.x));
+    float upper = fabsf(ceilf(point.x) - point.x);
+    float dx = (under > upper)  ? upper : under;
+    under = fabsf(point.y - floorf(point.y));
+    upper = fabsf(ceilf(point.y) - point.y);
+    float dy = (under > upper)  ? upper : under;
+    
+    if (dx > dy ) return point.x - floorf(point.x);
+    else return point.y - floorf(point.y);
 }
 
 Vector2 screenCordsToMapCords(Vector2 pos) {
@@ -327,7 +329,8 @@ float sign(float x) {
 }
 
 void loadResources() {
-    brick = LoadImageRaw(const char *fileName, int width, int height, int format, int headerSize);
+    brick = LoadImage("resources/bricks.png");
+    BrickColors = LoadImageColors(brick);
 }
 
 void unloadResources() {
