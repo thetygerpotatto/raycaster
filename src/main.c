@@ -4,12 +4,28 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <math.h>
+#include <string.h>
+
+typedef struct Cell {
+    bool textured;
+    bool bound;
+    Color sides[4];
+    Color** TextureColors;
+    Image* img;
+} Cell;
 
 typedef struct map {
     size_t rows;
     size_t cols;
-    Color **cells;
+    Cell **cells;
 } map;
+
+enum SIDE {
+    NORTH = 0,
+    SOUTH,
+    EAST,
+    WEST
+};
 
 // Drawing functions 
 void drawMiniMap();
@@ -19,7 +35,8 @@ void renderFOV(Vector2 p1, float fov, float angle, Vector2 dir);
 
 // logic functions
 Vector2 screenCordsToMapCords(Vector2 pos);
-Color** createMap(map m);
+Cell** createMap(map m);
+Cell getRandomCel();
 bool isWhole(float n);
 bool cmpColor(Color a, Color b);
 Vector2 getClosest(Vector2 vec1, Vector2 vec2, Vector2 vec3);
@@ -28,6 +45,8 @@ float sign(float x);
 Vector2 step(Vector2 pc, float angle);
 Vector2 collision(Vector2 newcords, Vector2 oldCords);
 float getWallTouchPoint(Vector2 point);
+enum SIDE getTouchSide(Vector2 p);
+
 
 // load and unload resources
 void loadResources();
@@ -52,11 +71,20 @@ const float EPS = 1e-3;
 const Color backgroundColor = {0x45,0x45,0x45,0xff};
 const Color wallColor = {0x19, 0x19, 0x19, 0xff};
 const Color rayColor = {0xe5,0xbe,0x01,0xff};
+
 Color *BrickColors;
 
 map gameMap = {.cols = H_SEGMENTS, .rows = V_SEGMENTS};
 // Texture variables
 Image brick;
+
+const Cell BoundCell = {.textured = true,
+                        .bound = true,
+                        .img = &brick,
+                        .sides = {wallColor, wallColor, wallColor, wallColor},
+                        .TextureColors = &BrickColors};
+const Cell EmptyCell = {.textured = false,
+                        .bound = false};
 
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
@@ -66,7 +94,7 @@ int main(int argc, char ** argv) {
     float viewAngle = 0;
 
     Vector2 dir = {cosf(viewAngle), sinf(viewAngle)};
-    const float fov = PI/2;
+    const float fov = PI/3;
     
     bool render = true;
 
@@ -78,25 +106,27 @@ int main(int argc, char ** argv) {
 
     for (size_t x = 0; x < gameMap.cols; x++) {
         for (size_t y = 0; y < gameMap.rows; y++) {
-            gameMap.cells[x][y] = wallColor;
+            memcpy(&gameMap.cells[x][y], &EmptyCell, sizeof(Cell));
         }
     }
 
     for (size_t x = 0; x < gameMap.cols; x++) {
         for (size_t y = 0; y < gameMap.rows; y++) {
-            if (x == 0 || x == gameMap.cols-1 || y == 0 || y == gameMap.rows-1) gameMap.cells[x][y] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
+            if (x == 0 || x == gameMap.cols-1 || y == 0 || y == gameMap.rows-1) 
+                memcpy(&gameMap.cells[x][y], &BoundCell, sizeof(Cell));
         }
     }
 
-    gameMap.cells[5][5] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[6][5] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[7][5] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[8][5] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[5][6] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[8][6] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[8][7] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[8][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
-    gameMap.cells[7][9] = (Color){rand()%255, rand()%255, rand()%255, 0xff};
+    gameMap.cells[2][2] = (Cell){.sides = {RED, BLUE, YELLOW, GREEN}, .bound = true, .textured = false};
+    gameMap.cells[5][5] = getRandomCel();
+    gameMap.cells[6][5] = getRandomCel();
+    gameMap.cells[7][5] = getRandomCel();
+    gameMap.cells[8][5] = getRandomCel();
+    gameMap.cells[5][6] = getRandomCel();
+    gameMap.cells[8][6] = getRandomCel();
+    gameMap.cells[8][7] = getRandomCel();
+    gameMap.cells[8][9] = getRandomCel();
+    gameMap.cells[7][9] = getRandomCel();
 
     while (!WindowShouldClose()) {
 
@@ -122,7 +152,8 @@ int main(int argc, char ** argv) {
         
         dir = (Vector2){cosf(viewAngle), sinf(viewAngle)};
 
-        if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, 0.06f)), centerPoint);
+        if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, 0.06f)),
+                                                      centerPoint);
         if (IsKeyDown(KEY_S)) centerPoint = collision(Vector2Subtract(centerPoint, Vector2Scale(dir, 0.06f)),
                                                       centerPoint);
         if (IsKeyDown(KEY_D)) centerPoint = collision(Vector2Add(centerPoint,
@@ -154,8 +185,8 @@ Vector2 step(Vector2 pc, float angle) {
             xp2.y = p1.y;
             xp2.y += (xp2.x - p1.x)*tanf(angle);
         } else {
-            xp2.x = (dir_y < 0) ? 0 : gameMap.cols;
-            xp2.y = p1.y;
+            xp2.y = (dir_y < 0) ? 0 : gameMap.cols;
+            xp2.x = p1.x;
         }
         
         if (dir_y != 0){
@@ -171,9 +202,9 @@ Vector2 step(Vector2 pc, float angle) {
         p1 = p2;
 
         if (p2.x > 0 && p2.x < gameMap.cols &&
-            p2.y > 0 && p2.x < gameMap.rows) {
+            p2.y > 0 && p2.y < gameMap.rows) {
 
-            if (!cmpColor(gameMap.cells[(int)p2.x][(int)p2.y], wallColor)) {
+            if (gameMap.cells[(int)p2.x][(int)p2.y].bound) {
                 return p2;
             }
         } 
@@ -214,7 +245,7 @@ void drawMiniMap() {
 
     for (size_t cols = 0; cols < gameMap.cols; ++cols) {
         for (size_t rows = 0 ; rows < gameMap.rows; ++rows) {
-            if (!cmpColor(gameMap.cells[cols][rows], wallColor)) {
+            if (gameMap.cells[cols][rows].bound) {
                 DrawRectangle(miniMapCords.x + spacing_x*cols+1, miniMapCords.y + spacing_y*rows+1, spacing_x-2, spacing_y-2 , wallColor);
             }
         }
@@ -236,8 +267,9 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
         float defaultDistance = H_SEGMENTS;
         
         int wallXOffset = (int)(getWallTouchPoint(p1) * (float)brick.width);
-
-        Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
+        enum SIDE touchSide = getTouchSide(p1);
+        
+        //Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
         
         int upperBound = endDrawing;
         for (int start = startDrawing; start < upperBound; start+=4) {
@@ -247,7 +279,17 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
             }
             int pixelHeight = (start - startDrawing);
             int pixelYIndex = (int)((float)pixelHeight/(endDrawing - startDrawing) * (float)brick.height);
-            DrawRectangle(x, start, 4, 4, ColorBrightness(BrickColors[brick.width*pixelYIndex + wallXOffset], distance/defaultDistance - 0.5f));
+            Cell CurrentCell = gameMap.cells[(int)p1.x][(int)p1.y];
+
+            if (CurrentCell.textured) {
+                DrawRectangle(x, start, 4, 4, 
+                              Fade((*CurrentCell.TextureColors)[brick.width*pixelYIndex + wallXOffset],
+                                1/distance + 0.3f));
+            } else {
+                DrawRectangle(x, start, 4, 4, 
+                              Fade(CurrentCell.sides[touchSide],
+                                1/distance + 0.3f));
+            }
         }
     }
 
@@ -283,6 +325,25 @@ float getWallTouchPoint(Vector2 point) {
     else return point.y - floorf(point.y);
 }
 
+enum SIDE getTouchSide(Vector2 point) {
+    Vector2 Cardinal[4] = {{0.5f, 0.0f},
+                            {0.5f, 1},
+                            {1, 0.5f},
+                            {0, 0.5f}};
+    Vector2 newPoint = {point.x - floorf(point.x), point.y - floorf(point.y)};
+    float distance = 1000;
+    int facing;
+    for (int i = 0; i < 4 ; ++i) {
+        if (Vector2Distance(newPoint, Cardinal[i]) < distance) {
+            facing = i;
+            distance = Vector2Distance(newPoint, Cardinal[i]);
+        }
+
+    }
+
+    return facing;
+}
+
 Vector2 screenCordsToMapCords(Vector2 pos) {
     return (Vector2){miniMapCords.x + pos.x/MINIMAP_WIDTH*H_SEGMENTS, miniMapCords.y + pos.y/MINIMAP_HEIGHT*H_SEGMENTS};
 }
@@ -290,7 +351,7 @@ Vector2 screenCordsToMapCords(Vector2 pos) {
 Vector2 collision(Vector2 newcords, Vector2 oldCords) {
     if (newcords.x > 0 && newcords.x < gameMap.cols &&
         newcords.y > 0 && newcords.y < gameMap.rows) {
-        if (!cmpColor(gameMap.cells[(int)newcords.x][(int)newcords.y], wallColor)) {
+        if (gameMap.cells[(int)newcords.x][(int)newcords.y].bound) {
             return oldCords;
         } 
         else return newcords;
@@ -298,13 +359,24 @@ Vector2 collision(Vector2 newcords, Vector2 oldCords) {
     return oldCords;
 }
 
-Color** createMap(map m) {
-    Color** newMap;
-    newMap = calloc(m.rows, sizeof(Color**));
+Cell** createMap(map m) {
+    Cell** newMap;
+    newMap = calloc(m.rows, sizeof(Cell**));
     for (size_t i = 0; i < m.rows; ++i) {
-        newMap[i] = calloc(m.cols, sizeof(Color));
+        newMap[i] = calloc(m.cols, sizeof(Cell));
     }
     return newMap;
+}
+
+Cell getRandomCel() {
+    Cell c = {.textured = false,
+            .bound = true,
+            .sides = {(Color){rand()%255, rand()%255, rand()%255, rand()%255},
+                    (Color){rand()%255, rand()%255, rand()%255, rand()%255},
+                    (Color){rand()%255, rand()%255, rand()%255, rand()%255},
+                    (Color){rand()%255, rand()%255, rand()%255, rand()%255}}
+            };
+    return c;
 }
 
 bool isWhole(float n) {
