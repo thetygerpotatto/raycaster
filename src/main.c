@@ -6,26 +6,7 @@
 #include <math.h>
 #include <string.h>
 
-typedef struct Cell {
-    bool textured;
-    bool bound;
-    Color sides[4];
-    Color** TextureColors;
-    Image* img;
-} Cell;
-
-typedef struct map {
-    size_t rows;
-    size_t cols;
-    Cell **cells;
-} map;
-
-enum SIDE {
-    NORTH = 0,
-    SOUTH,
-    EAST,
-    WEST
-};
+#include "types.h"
 
 // Drawing functions 
 void drawMiniMap();
@@ -66,7 +47,7 @@ const Vector2 miniMapCords = {SCREEN_WIDTH - MINIMAP_WIDTH, 0};
 const float spacing_x = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
 const float spacing_y = (float)MINIMAP_WIDTH/(float)H_SEGMENTS;
 
-const float EPS = 1e-3;
+const float EPS = 1e-4;
 
 const Color backgroundColor = {0x45,0x45,0x45,0xff};
 const Color wallColor = {0x19, 0x19, 0x19, 0xff};
@@ -88,7 +69,7 @@ const Cell EmptyCell = {.textured = false,
 
 int main(int argc, char ** argv) {
     gameMap.cells = createMap(gameMap);
-    
+    float playerVelocity = 2.0f;
     Vector2 centerPoint = {2, 2};
     Vector2 seccondPoint = {6, 6};
     float viewAngle = 0;
@@ -141,9 +122,6 @@ int main(int argc, char ** argv) {
             drawMiniMap();
 
 
-            drawPointInMap(centerPoint, 5.0f);
-            drawPointInMap(seccondPoint, 5.0f);
-            drawLineInMap(centerPoint, seccondPoint);
 
             render = false;
         }
@@ -152,18 +130,18 @@ int main(int argc, char ** argv) {
         
         dir = (Vector2){cosf(viewAngle), sinf(viewAngle)};
 
-        if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, 0.06f)),
+        if (IsKeyDown(KEY_W)) centerPoint = collision(Vector2Add(centerPoint, Vector2Scale(dir, playerVelocity*GetFrameTime())),
                                                       centerPoint);
-        if (IsKeyDown(KEY_S)) centerPoint = collision(Vector2Subtract(centerPoint, Vector2Scale(dir, 0.06f)),
+        if (IsKeyDown(KEY_S)) centerPoint = collision(Vector2Subtract(centerPoint, Vector2Scale(dir, playerVelocity*GetFrameTime())),
                                                       centerPoint);
         if (IsKeyDown(KEY_D)) centerPoint = collision(Vector2Add(centerPoint,
-                                                       Vector2Scale(Vector2Rotate(dir, PI/2.0f), 0.06f)),
+                                                       Vector2Scale(Vector2Rotate(dir, PI/2.0f), playerVelocity*GetFrameTime())),
                                                       centerPoint);
         if (IsKeyDown(KEY_A)) centerPoint = collision(Vector2Add(centerPoint,
-                                                       Vector2Scale(Vector2Rotate(dir, -PI/2.0f), 0.06f))
+                                                       Vector2Scale(Vector2Rotate(dir, -PI/2.0f), playerVelocity*GetFrameTime()))
                                                         , centerPoint);
-        if (IsKeyDown(KEY_LEFT)) viewAngle -= PI/120.0f;
-        if (IsKeyDown(KEY_RIGHT)) viewAngle += PI/120.0f;
+        if (IsKeyDown(KEY_LEFT)) viewAngle -= PI/2.0f*GetFrameTime();
+        if (IsKeyDown(KEY_RIGHT)) viewAngle += PI/2.0f*GetFrameTime();
         if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D) ||
             IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_RIGHT)) render = true;
     }
@@ -253,12 +231,19 @@ void drawMiniMap() {
 }
 
 void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
-    for (int x = 0; x < SCREEN_WIDTH; x+=4) {
+    const int PIXEL_SIZE = 4;
+    drawPointInMap(pc, 5.0f);
+    Vector2 end = step(pc, angle);
+    drawPointInMap(end, 5.0f);
+    drawLineInMap(pc, end);
+    // Floor and Ceilling rendering
+
+    // Wall Rendering
+    for (int x = 0; x < SCREEN_WIDTH; x+=PIXEL_SIZE) {
         float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
 
 
-        drawLineInMap(pc, p1);
         Vector2 v = Vector2Subtract(p1, pc);
         float distance = Vector2DotProduct(v, dir);
         float wallHeight = SCREEN_HEIGHT / distance;
@@ -269,10 +254,8 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
         int wallXOffset = (int)(getWallTouchPoint(p1) * (float)brick.width);
         enum SIDE touchSide = getTouchSide(p1);
         
-        //Color wallShade = ColorBrightness(gameMap.cells[(int)p1.x][(int)p1.y], distance/defaultDistance - 0.5f);
-        
         int upperBound = endDrawing;
-        for (int start = startDrawing; start < upperBound; start+=4) {
+        for (int start = startDrawing; start < upperBound; start+=PIXEL_SIZE) {
             if (start < 0 || start > SCREEN_HEIGHT) {
                 start = 0;
                 upperBound = SCREEN_HEIGHT;
@@ -281,16 +264,12 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
             int pixelYIndex = (int)((float)pixelHeight/(endDrawing - startDrawing) * (float)brick.height);
             Cell CurrentCell = gameMap.cells[(int)p1.x][(int)p1.y];
 
-            if (CurrentCell.textured) {
-                DrawRectangle(x, start, 4, 4, 
-                              Fade((*CurrentCell.TextureColors)[brick.width*pixelYIndex + wallXOffset],
-                                1/distance + 0.3f));
-            } else {
-                DrawRectangle(x, start, 4, 4, 
-                              Fade(CurrentCell.sides[touchSide],
-                                1/distance + 0.3f));
-            }
+            Color pixelColor = (CurrentCell.textured) 
+                                ? (*CurrentCell.TextureColors)[brick.width*pixelYIndex + wallXOffset] 
+                                : CurrentCell.sides[touchSide];
+            DrawRectangle(x, start, PIXEL_SIZE, PIXEL_SIZE, Fade(pixelColor, 1/distance + 0.3f));
         }
+        drawLineInMap(pc, p1);
     }
 
 }
@@ -305,12 +284,6 @@ void drawLineInMap(Vector2 pos1, Vector2 pos2) {
     Vector2 screenPos2 = {miniMapCords.x + pos2.x*spacing_x, miniMapCords.y + pos2.y*spacing_y};
 
     DrawLineV(screenPos1, screenPos2, rayColor);
-}
-
-void createStripeFromImage(Image *source, Image *dest,  float x) {
-    Rectangle crop = {(int)(x), 0, 1 , source->height};
-    *dest = ImageCopy(*source);
-    ImageCrop(dest, crop);
 }
 
 float getWallTouchPoint(Vector2 point) {
