@@ -75,7 +75,7 @@ int main(int argc, char ** argv) {
     float viewAngle = 0;
 
     Vector2 dir = {cosf(viewAngle), sinf(viewAngle)};
-    const float fov = PI/3;
+    const float fov = 7*PI/20;
     
     bool render = true;
 
@@ -125,7 +125,6 @@ int main(int argc, char ** argv) {
 
             render = false;
         }
-        EndDrawing();
 
         
         dir = (Vector2){cosf(viewAngle), sinf(viewAngle)};
@@ -144,6 +143,7 @@ int main(int argc, char ** argv) {
         if (IsKeyDown(KEY_RIGHT)) viewAngle += PI/2.0f*GetFrameTime();
         if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_D) ||
             IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_RIGHT)) render = true;
+        EndDrawing();
     }
     unloadResources();
 }
@@ -239,14 +239,14 @@ void renderFOV(Vector2 pc, float fov, float angle, Vector2 dir) {
     // Floor and Ceilling rendering
 
     // Wall Rendering
-    for (int x = 0; x < SCREEN_WIDTH; x+=PIXEL_SIZE) {
+    for (int x = 1; x <= SCREEN_WIDTH; x+=PIXEL_SIZE) {
         float currentAngle = (angle - fov / 2) + fov/SCREEN_WIDTH*x; 
         Vector2 p1 = step(pc, currentAngle);
 
 
         Vector2 v = Vector2Subtract(p1, pc);
         float distance = Vector2DotProduct(v, dir);
-        float wallHeight = SCREEN_HEIGHT / distance;
+        float wallHeight = SCREEN_HEIGHT / distance*1.2f;
         float startDrawing = (float)SCREEN_HEIGHT/2 - wallHeight/2;
         float endDrawing = (float)SCREEN_HEIGHT/2 + wallHeight/2;
         float defaultDistance = H_SEGMENTS;
